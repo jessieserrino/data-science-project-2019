@@ -1,6 +1,0 @@
-"0","Rotated_Factors_thres <- Rotated_Factors"
-"0","Rotated_Factors_thres[abs(Rotated_Factors_thres) < MIN_VALUE]<-NA"
-"0","colnames(Rotated_Factors_thres)<- colnames(Rotated_Factors)"
-"0","rownames(Rotated_Factors_thres)<- rownames(Rotated_Factors)"
-"0",""
-"0","iprint.df(Rotated_Factors_thres, scale=TRUE)"

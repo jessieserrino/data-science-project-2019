@@ -1,2 +1,0 @@
-"0","Pairwise_Distances <- dist(ProjectData_segment, method = distance_used) "
-"0","#iplot.hist(Pairwise_Distances, breaks=10)"

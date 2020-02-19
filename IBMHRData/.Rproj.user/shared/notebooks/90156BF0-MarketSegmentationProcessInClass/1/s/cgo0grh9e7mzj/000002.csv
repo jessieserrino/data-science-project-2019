@@ -1,4 +1,0 @@
-"0","variables_to_plot = 1:2"
-"0","do.call(iplot.grid, lapply(variables_to_plot, function(n){"
-"0","  iplot.hist(ProjectData_segment[, n], breaks=10, xlab = paste(""Variable"", n))"
-"0","}))"

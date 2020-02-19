@@ -1,4 +1,0 @@
-"0","NEW_ProjectData <- round(Rotated_Results$scores[,1:factors_selected,drop=F],2)"
-"0","colnames(NEW_ProjectData)<-paste(""Component(Factor)"",1:ncol(NEW_ProjectData),sep="" "")"
-"0",""
-"0","iprint.df(t(head(NEW_ProjectData, 10)), scale=TRUE)"

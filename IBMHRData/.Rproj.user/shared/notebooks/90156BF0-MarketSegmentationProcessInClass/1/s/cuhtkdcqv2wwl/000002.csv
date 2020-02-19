@@ -1,6 +1,0 @@
-"0","if (factor_selectionciterion == ""eigenvalue"")"
-"0","  factors_selected = sum(Variance_Explained_Table_copy[,1] >= 1)"
-"0","if (factor_selectionciterion == ""variance"")"
-"0","  factors_selected = 1:head(which(Variance_Explained_Table_copy[,""cumulative percentage of variance""]>= minimum_variance_explained),1)"
-"0","if (factor_selectionciterion == ""manual"")"
-"0","  factors_selected = manual_numb_factors_used"

@@ -1,4 +1,0 @@
-"0","ProjectData <- read.csv(""IBMHRData.csv"", na.strings=c("""","" "",""NA""), header=TRUE) # Loading data"
-"0","ProjectData <- clean(ProjectData)"
-"0","ProjectData <- data.matrix(ProjectData) "
-"0","ProjectData_INITIAL <- ProjectData"

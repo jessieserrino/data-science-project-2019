@@ -1,6 +1,0 @@
-"0","euclidean_pairwise <- as.matrix(dist(head(ProjectData_segment, max_data_report), method=""euclidean""))"
-"0","euclidean_pairwise <- euclidean_pairwise*lower.tri(euclidean_pairwise) + euclidean_pairwise*diag(euclidean_pairwise) + 10e10*upper.tri(euclidean_pairwise)"
-"0","euclidean_pairwise[euclidean_pairwise==10e10] <- NA"
-"0","rownames(euclidean_pairwise) <- colnames(euclidean_pairwise) <- sprintf(""Obs.%02d"", 1:max_data_report)"
-"0",""
-"0","iprint.df(round(euclidean_pairwise))"

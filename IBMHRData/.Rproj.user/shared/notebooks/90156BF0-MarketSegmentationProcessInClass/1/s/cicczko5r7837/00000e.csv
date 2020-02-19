@@ -1,8 +1,0 @@
-"0","thecor = round(cor(ProjectDataFactor),2)"
-"0","#iprint.df(round(thecor,2), scale=TRUE)"
-"0","thecor_thres <- thecor"
-"0","thecor_thres[abs(thecor_thres) < MIN_VALUE]<-NA"
-"0","colnames(thecor_thres)<- colnames(thecor)"
-"0","rownames(thecor_thres)<- rownames(thecor)"
-"0",""
-"0","iprint.df(thecor_thres, scale=TRUE)"

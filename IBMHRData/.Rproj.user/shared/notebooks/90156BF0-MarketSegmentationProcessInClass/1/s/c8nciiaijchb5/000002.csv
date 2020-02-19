@@ -1,4 +1,0 @@
-"0","num <- nrow(ProjectData) - 1"
-"0","df1 <- cbind(as.data.frame(Hierarchical_Cluster$height[length(Hierarchical_Cluster$height):1]), c(1:num))"
-"0","colnames(df1) <- c(""distances"",""index"")"
-"0","iplot.df(melt(head(df1, 30), id=""index""), xlab=""Number of Components"", ylab = ""Distances"")"
