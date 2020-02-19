@@ -5,20 +5,10 @@ opts_knit$set(progress=FALSE, verbose=FALSE)
 opts_chunk$set(echo=FALSE, fig.align="center", fig.width=10, fig.height=6.35, results="asis")
 options(knitr.kable.NA = '')
 
-# New versions of the networkD3 package may not work properly, so install the following version
-#packageurl <- "https://cran.r-project.org/src/contrib/Archive/networkD3/networkD3_0.2.13.tar.gz"
-#install.packages(packageurl, repos=NULL, type="source")
-if("pacman" %in% rownames(installed.packages()) == FALSE) {install.packages("pacman")}
-pacman::p_load("caret", "dplyr", "e1071", "glmnet","lift","MASS", "ROCR", "partykit", "pracma","xgboost")
-library(stringr)
-library(dplyr)
+
 source("team_helper_functions.r")
 
-
-# The Data
-# Please enter the minimum number below which you would like not to print - this makes the readability of the tables easier. Default values are either 10e6 (to print everything) or 0.5. Try both to see the difference.
 MIN_VALUE = 0.5
-# Please enter the maximum number of observations to show in the report and slides. 
 max_data_report = 10
 
 ProjectData <- read.csv("input/data.csv", na.strings=c(""," ","NA"), header=TRUE) # Loading data
@@ -32,14 +22,14 @@ ProjectData_INITIAL <- ProjectData
 factor_attributes_used = c(2:ncol(ProjectData)) # for BOATS Data
 
 # Choices: "eigenvalue", "variance", "manual"
-factor_selectionciterion = "eigenvalue"
+factor_selectionciterion = "manual"
 
 # (Only used in case "variance" is the factor selection criterion used). 
 minimum_variance_explained = 65  # between 1 and 100
 
 # Please ENTER the number of factors to use 
 # (Only used in case "manual" is the factor selection criterion used).
-manual_numb_factors_used = 6
+manual_numb_factors_used = 7
 
 # Please ENTER the rotation eventually used (e.g. "none", "varimax", "quatimax", "promax", "oblimin", "simplimax", and "cluster" - see help(principal)). Default is "varimax"
 rotation_used = "varimax"
@@ -60,7 +50,7 @@ correlations_thres[abs(correlations_thres) < MIN_VALUE]<-NA
 colnames(correlations_thres)<- colnames(correlations)
 rownames(correlations_thres)<- rownames(correlations)
 
-iprint.df(correlations_thres, scale=TRUE)
+print(correlations_thres, scale=TRUE)
 
 ## Step 4: Choose number of factors
 
@@ -79,7 +69,7 @@ rownames(Variance_Explained_Table) <- paste("Component", 1:nrow(Variance_Explain
 colnames(Variance_Explained_Table) <- c("Eigenvalue", "Pct of explained variance", "Cumulative pct of explained variance")
 
 
-iprint.df(round(Variance_Explained_Table, 2))
+print(round(Variance_Explained_Table, 2))
 
 eigenvalues  <- Variance_Explained_Table[, "Eigenvalue"]
 df           <- cbind(as.data.frame(eigenvalues), c(1:length(eigenvalues)), rep(1, length(eigenvalues)))
@@ -102,47 +92,33 @@ colnames(Rotated_Factors)<-paste("Comp.",1:ncol(Rotated_Factors),sep="")
 sorted_rows <- sort(Rotated_Factors[,1], decreasing = TRUE, index.return = TRUE)$ix
 Rotated_Factors <- Rotated_Factors[sorted_rows,]
 
-iprint.df(Rotated_Factors, scale=TRUE)
+print(Rotated_Factors, scale=TRUE)
 
 Rotated_Factors_thres <- Rotated_Factors
 Rotated_Factors_thres[abs(Rotated_Factors_thres) < MIN_VALUE]<-NA
 colnames(Rotated_Factors_thres)<- colnames(Rotated_Factors)
 rownames(Rotated_Factors_thres)<- rownames(Rotated_Factors)
 
-iprint.df(Rotated_Factors_thres, scale=TRUE)
+print(Rotated_Factors_thres, scale=TRUE)
 
 ## Step 6:  Save factor scores 
 NEW_ProjectData <- round(Rotated_Results$scores[,1:factors_selected,drop=F],2)
 colnames(NEW_ProjectData)<-paste("Component(Factor)",1:ncol(NEW_ProjectData),sep=" ")
 
-iprint.df(t(head(NEW_ProjectData, 10)), scale=TRUE)
+print(t(head(NEW_ProjectData, 10)), scale=TRUE)
 
 # Part 2: Customer Segmentation 
 # Please ENTER then original raw attributes to use for the segmentation (the "segmentation attributes")
 # Please use numbers, not column names, e.g. c(1:5, 7, 8) uses columns 1,2,3,4,5,7,8
-segmentation_attributes_used = c(29,17,24,14,8,9,22,7,20,3,12,27,18) 
-#segmentation_attributes_used = c(2:ncol(ProjectData)) 
-
-profile_attributes_used = c(29,17,24,14,8,9,22,7,20,3,12,27,18) 
-numb_clusters_used = 6 
+#segmentation_attributes_used = c(29,17,24,14,8,9,22,7,20,3,12,27,18) 
+segmentation_attributes_used = c(2:10, 12:21, 23:25, 29:ncol(ProjectData))
+profile_attributes_used = segmentation_attributes_used
+numb_clusters_used = 6
 
 profile_with = "hclust" #  "hclust" or "kmeans"
-
-# Please ENTER the distance metric eventually used for the clustering in case of hierarchical clustering 
-# (e.g. "euclidean", "maximum", "manhattan", "canberra", "binary" or "minkowski" - see help(dist)). 
-# DEFAULT is "euclidean"
-distance_used = "euclidean"
-
-# Please ENTER the hierarchical clustering method to use (options are:
-# "ward", "single", "complete", "average", "mcquitty", "median" or "centroid").
-# DEFAULT is "ward"
-#hclust_method = "ward.D"
+distance_used = "euclidean" # "euclidean", "maximum", "manhattan", "canberra", "binary" or "minkowski"
 hclust_method = "ward.D"
-
-# Please ENTER the kmeans clustering method to use (options are:
-# "Hartigan-Wong", "Lloyd", "Forgy", "MacQueen").
-# DEFAULT is "Lloyd"
-kmeans_method = "Lloyd"
+kmeans_method = "Lloyd" # "Hartigan-Wong", "Lloyd", "Forgy", "MacQueen").
 
 # Same as the initial data
 ProjectData <- ProjectData_INITIAL
@@ -162,26 +138,24 @@ euclidean_pairwise <- euclidean_pairwise*lower.tri(euclidean_pairwise) + euclide
 euclidean_pairwise[euclidean_pairwise==10e10] <- NA
 rownames(euclidean_pairwise) <- colnames(euclidean_pairwise) <- sprintf("Obs.%02d", 1:max_data_report)
 
-iprint.df(round(euclidean_pairwise))
+print(round(euclidean_pairwise))
 
 ## Step 5: Visualize Pair-wise Distances
-variables_to_plot = 1:2
-do.call(iplot.grid, lapply(variables_to_plot, function(n){
-  iplot.hist(ProjectData_segment[, n], breaks=10, xlab = paste("Variable", n))
-}))
+# variables_to_plot = 1:2
+# do.call(iplot.grid, lapply(variables_to_plot, function(n){
+#   iplot.hist(ProjectData_segment[, n], breaks=10, xlab = paste("Variable", n))
+# }))
+# 
+# Pairwise_Distances <- dist(ProjectData_segment, method = distance_used) 
+# #iplot.hist(Pairwise_Distances, breaks=10)
 
-Pairwise_Distances <- dist(ProjectData_segment, method = distance_used) 
-#iplot.hist(Pairwise_Distances, breaks=10)
-
-gc()
 Hierarchical_Cluster_distances <- dist(ProjectData_segment, method=distance_used)
 Hierarchical_Cluster <- hclust(Hierarchical_Cluster_distances, method=hclust_method)
 # Display dendogram
-#iplot.dendrogram(Hierarchical_Cluster)
 
 #
 hcd <- as.dendrogram(Hierarchical_Cluster)
-#plot(hcd)
+plot(hcd)
 #rect.hclust(Hierarchical_Cluster, k=numb_clusters_used, border="red") 
 
 # TODO: Draw dendogram with red borders around the 3 clusters

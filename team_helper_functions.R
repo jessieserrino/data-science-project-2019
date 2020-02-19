@@ -1,3 +1,28 @@
+if("pacman" %in% rownames(installed.packages()) == FALSE) {install.packages("pacman")}
+pacman::p_load("caret", "dplyr", "e1071", "glmnet","lift","MASS", "ROCR", "partykit", "pracma","xgboost", "Hmisc", "pastecs", "psych", "plyr")
+
+library(stringr)
+library(dplyr)
+library(plyr)
+
+# splitData <- function (data, training_pct) {
+#   size_all <- nrow(data)
+#   size_training <- size_all * training_pct
+#   
+#   set.seed(110392) 
+#   inTrain <- createDataPartition(y = data$Is_Resigning,
+#                                  p = training_pct, list = FALSE)
+#   training <- data[ inTrain,]
+#   validation_and_testing <- data[ -inTrain,]
+#   
+#   inTest <- createDataPartition(y = validation_and_testing$Is_Resigning, p = 0.5, list = FALSE)
+#   validation <- validation_and_testing[ -inTest,]
+#   
+#   testing <- validation_and_testing[ inTest,]
+#   
+#   return(list(training = training, validation = validation, testing = testing))
+# }
+
 fixNAs <- function(data_frame){
   integer_reac <- 0
   factor_reac <- "Other"
@@ -47,23 +72,35 @@ clean <- function(data_frame) {
   data_frame$Over18 <- NULL
   data_frame$StandardHours <- NULL
   
-  # Deleting bad tdata
+  # Deleting bad data
   data_frame$HourlyRate <- NULL
   data_frame$DailyRate <- NULL
   data_frame$MonthlyRate <- NULL
   
-  if (!is.null(data_frame$Attrition)) { 
+  if (!is.null(data_frame$Attrition)) {
     data_frame <- within(data_frame, Is_Resigning <- numeric_factor(Attrition %in% c("Voluntary Resignation")) )
     data_frame <- data_frame[,c(ncol(data_frame),1:(ncol(data_frame)-1))]
   }
-  
-  # Deleting the Attrition variable, otherwise it will mess up our model and make it too good ;)
-  data_frame$Attrition <- NULL 
-  
+  data_frame$Attrition <- NULL
+
   # Fixing Rare Categories & NAs
   data_frame <- fixNAs(data_frame)
   data_frame <- combineRareCategories(data_frame, 10)
-  levels(data$MaritalStatus) <- c("Single","Married","Divorced", "Other")
-  
+
   return(data_frame)
 }
+
+### Analyze clusters
+# files <- c("ProjectData_with_hclust_membership_all_factors.csv",
+#             "ProjectData_with_hclust_membership_compressed_factors.csv",
+#             "ProjectData_with_kmeans_membership_all_factors.csv",
+#             "ProjectData_with_kmeans_membership_compressed_factors.csv")
+# for (file in files) {
+#   data <- read.csv(file, na.strings=c(""," ","NA"), header=TRUE) # Loading data
+#   data <- clean(data)
+#   desc <- describeBy(data, data$cluster, mat = TRUE)
+#   write.csv(desc, paste(file, "_RESULTS.csv"))
+# }
+# 
+
+

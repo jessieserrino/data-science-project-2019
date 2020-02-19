@@ -1,80 +1,43 @@
-if("pacman" %in% rownames(installed.packages()) == FALSE) {install.packages("pacman")}
-pacman::p_load("caret", "dplyr", "e1071", "glmnet","lift","MASS", "ROCR", "partykit", "pracma","xgboost", "Hmisc", "pastecs", "psych", "plyr")
-library(stringr)
-library(dplyr)
-library(plyr)
-
 source("team_helper_functions.r")
 
-##
-## Fixing bad data
-##
-
+# Clean data
 data <- read.csv("input/data.csv", na.strings=c(""," ","NA"), header=TRUE) # Loading data
-# data <- na.omit(data)
 data <- clean(data)
 
-### Analyze clusters
-# files <- c("ProjectData_with_hclust_membership_all_factors.csv",
-#             "ProjectData_with_hclust_membership_compressed_factors.csv",
-#             "ProjectData_with_kmeans_membership_all_factors.csv",
-#             "ProjectData_with_kmeans_membership_compressed_factors.csv")
-# for (file in files) {
-#   data <- read.csv(file, na.strings=c(""," ","NA"), header=TRUE) # Loading data
-#   data <- clean(data)
-#   desc <- describeBy(data, data$cluster, mat = TRUE)
-#   write.csv(desc, paste(file, "_RESULTS.csv"))
-# }
+# Split data
+split_data <- splitData(data, 0.8)
+training <- split_data$training
+validation <- split_data$validation
+testing <- split_data$testing
 
-##
-## Separating the data
-##
-
-training_pct <- 0.8
-size_all <- nrow(data)
-size_training <- size_all * training_pct
-
-set.seed(110392) 
-inTrain <- createDataPartition(y = data$Is_Resigning,
-                               p = training_pct, list = FALSE)
-training <- data[ inTrain,]
-validation_and_testing <- data[ -inTrain,]
-
-inTest <- createDataPartition(y = validation_and_testing$Is_Resigning, p = 0.5, list = FALSE)
-
-validation <- validation_and_testing[ -inTest,]
-
-# leave alone until very end
-testing <- validation_and_testing[ inTest,]
-
+avg_probability <- mean(training$Is_Resigning == "1")
 ##
 ## Defining the model using ctree
 #
 
-ctree_tree<-ctree(Is_Resigning~
-                  DistanceFromHome+
-                  EnvironmentSatisfaction+
-                  Age+
-                  StockOptionLevel+
-                  JobRole+
-                  Employee.Source+
-                  MaritalStatus+
-                  NumCompaniesWorked+
-                  YearsSinceLastPromotion+
-                  YearsWithCurrManager+
-                  YearsInCurrentRole+
-                  MonthlyIncome+
-                  JobLevel+
-                  YearsAtCompany+
-                  TotalWorkingYears,data=training)
+predictCTree <- function(training, testing, p) {
+  ctree_tree<-ctree(variable,data=training)
+  ctree_probabilities<-predict(ctree_tree,newdata=testing,type="prob") 
+  probabilities <- ctree_probabilities[,2]
+  
+  classification <- rep("1", nrow(testing))
+  classification[probabilities < p] = "0"
+  classification <- as.factor(classification)
+  
+  return(list(probabilities = probabilities, classification = classification))
+}
+
+ctree_tree<-ctree(variable,data=training)
 ctree_probabilities<-predict(ctree_tree,newdata=validation,type="prob") 
 probabilities <- ctree_probabilities[,2]
 classification <- rep("1", nrow(validation))
 
-avg_probability <- mean(training$Is_Resigning == "1")
 classification[probabilities < avg_probability] = "0"
 classification <- as.factor(classification)
-confusionMatrix(classification,validation$Is_Resigning, positive = "1")
+
+prediction <- predictCTree(training, validation, avg_probability)
+
+confusionMatrix(prediction$classification,validation$Is_Resigning, positive = "1")
 
 # ROC Curve
 ROC_prediction <- prediction(probabilities, validation$Is_Resigning)
