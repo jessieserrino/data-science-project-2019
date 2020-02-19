@@ -5,23 +5,23 @@ library(stringr)
 library(dplyr)
 library(plyr)
 
-# splitData <- function (data, training_pct) {
-#   size_all <- nrow(data)
-#   size_training <- size_all * training_pct
-#   
-#   set.seed(110392) 
-#   inTrain <- createDataPartition(y = data$Is_Resigning,
-#                                  p = training_pct, list = FALSE)
-#   training <- data[ inTrain,]
-#   validation_and_testing <- data[ -inTrain,]
-#   
-#   inTest <- createDataPartition(y = validation_and_testing$Is_Resigning, p = 0.5, list = FALSE)
-#   validation <- validation_and_testing[ -inTest,]
-#   
-#   testing <- validation_and_testing[ inTest,]
-#   
-#   return(list(training = training, validation = validation, testing = testing))
-# }
+splitData <- function (data, training_pct) {
+  size_all <- nrow(data)
+  size_training <- size_all * training_pct
+
+  set.seed(110392)
+  inTrain <- createDataPartition(y = data$Is_Resigning,
+                                 p = training_pct, list = FALSE)
+  training <- data[ inTrain,]
+  validation_and_testing <- data[ -inTrain,]
+
+  inTest <- createDataPartition(y = validation_and_testing$Is_Resigning, p = 0.5, list = FALSE)
+  validation <- validation_and_testing[ -inTest,]
+
+  testing <- validation_and_testing[ inTest,]
+
+  return(list(training = training, validation = validation, testing = testing))
+}
 
 fixNAs <- function(data_frame){
   integer_reac <- 0
@@ -76,6 +76,7 @@ clean <- function(data_frame) {
   data_frame$HourlyRate <- NULL
   data_frame$DailyRate <- NULL
   data_frame$MonthlyRate <- NULL
+  data_frame$StockOptionLevel <- NULL
   
   if (!is.null(data_frame$Attrition)) {
     data_frame <- within(data_frame, Is_Resigning <- numeric_factor(Attrition %in% c("Voluntary Resignation")) )
@@ -88,6 +89,18 @@ clean <- function(data_frame) {
   data_frame <- combineRareCategories(data_frame, 10)
 
   return(data_frame)
+}
+
+predictCTree <- function(variables, training, testing, p) {
+  ctree_tree<-ctree(variables,data=training)
+  ctree_probabilities<-predict(ctree_tree,newdata=testing,type="prob") 
+  probabilities <- ctree_probabilities[,2]
+  
+  classification <- rep("1", nrow(testing))
+  classification[probabilities < p] = "0"
+  classification <- as.factor(classification)
+  
+  return(list(probabilities = probabilities, classification = classification))
 }
 
 ### Analyze clusters

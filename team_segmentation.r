@@ -5,7 +5,6 @@ opts_knit$set(progress=FALSE, verbose=FALSE)
 opts_chunk$set(echo=FALSE, fig.align="center", fig.width=10, fig.height=6.35, results="asis")
 options(knitr.kable.NA = '')
 
-
 source("team_helper_functions.r")
 
 MIN_VALUE = 0.5
@@ -13,35 +12,18 @@ max_data_report = 10
 
 ProjectData <- read.csv("input/data.csv", na.strings=c(""," ","NA"), header=TRUE) # Loading data
 ProjectData <- clean(ProjectData)
+
 ProjectData <- data.matrix(ProjectData) 
 ProjectData_INITIAL <- ProjectData
 
-# Part 1: Key Customer Characteristics
-# Please ENTER the original raw attributes to use. 
-# Please use numbers, not column names, e.g. c(1:5, 7, 8) uses columns 1,2,3,4,5,7,8
-factor_attributes_used = c(2:ncol(ProjectData)) # for BOATS Data
-
-# Choices: "eigenvalue", "variance", "manual"
-factor_selectionciterion = "manual"
-
-# (Only used in case "variance" is the factor selection criterion used). 
-minimum_variance_explained = 65  # between 1 and 100
-
-# Please ENTER the number of factors to use 
-# (Only used in case "manual" is the factor selection criterion used).
-manual_numb_factors_used = 7
-
-# Please ENTER the rotation eventually used (e.g. "none", "varimax", "quatimax", "promax", "oblimin", "simplimax", and "cluster" - see help(principal)). Default is "varimax"
-rotation_used = "varimax"
-
+factor_attributes_used = c(2:ncol(ProjectData))
 factor_attributes_used <- intersect(factor_attributes_used, 1:ncol(ProjectData))
 ProjectDataFactor <- ProjectData[,factor_attributes_used]
 ProjectDataFactor <- data.matrix(ProjectDataFactor)
 
 ## Steps 1-2: Check the Data 
 rownames(ProjectDataFactor) <- paste0("Obs.", sprintf("%02i", 1:nrow(ProjectDataFactor)))
-iprint.df(t(head(round(ProjectDataFactor, 2), max_data_report)))
-iprint.df(round(my_summary(ProjectDataFactor), 2))
+print(round(my_summary(ProjectDataFactor), 2))
 
 ## Step 3: Check Correlations
 correlations = round(cor(ProjectDataFactor),2)
@@ -68,7 +50,6 @@ Variance_Explained_Table_copy<-Variance_Explained_Table
 rownames(Variance_Explained_Table) <- paste("Component", 1:nrow(Variance_Explained_Table), sep=" ")
 colnames(Variance_Explained_Table) <- c("Eigenvalue", "Pct of explained variance", "Cumulative pct of explained variance")
 
-
 print(round(Variance_Explained_Table, 2))
 
 eigenvalues  <- Variance_Explained_Table[, "Eigenvalue"]
@@ -77,13 +58,19 @@ colnames(df) <- c("eigenvalues", "components", "abline")
 iplot.df(melt(df, id="components"))
 
 ## Step 5: Interpret the factors
-if (factor_selectionciterion == "eigenvalue")
+factor_selection_criterion = "manual"
+
+manual_numb_factors_used = 6 # only used in manual case
+minimum_variance_explained = 65  # 1 - 100 (Only used in case "variance" is the factor selection criterion used). 
+
+if (factor_selection_criterion == "eigenvalue")
   factors_selected = sum(Variance_Explained_Table_copy[,1] >= 1)
-if (factor_selectionciterion == "variance")
+if (factor_selection_criterion == "variance")
   factors_selected = 1:head(which(Variance_Explained_Table_copy[,"cumulative percentage of variance"]>= minimum_variance_explained),1)
-if (factor_selectionciterion == "manual")
+if (factor_selection_criterion == "manual")
   factors_selected = manual_numb_factors_used
 
+rotation_used = "varimax"
 Rotated_Results<-principal(ProjectDataFactor, nfactors=max(factors_selected), rotate=rotation_used,score=TRUE)
 Rotated_Factors<-round(Rotated_Results$loadings,2)
 Rotated_Factors<-as.data.frame(unclass(Rotated_Factors))
@@ -91,14 +78,10 @@ colnames(Rotated_Factors)<-paste("Comp.",1:ncol(Rotated_Factors),sep="")
 
 sorted_rows <- sort(Rotated_Factors[,1], decreasing = TRUE, index.return = TRUE)$ix
 Rotated_Factors <- Rotated_Factors[sorted_rows,]
-
-print(Rotated_Factors, scale=TRUE)
-
 Rotated_Factors_thres <- Rotated_Factors
 Rotated_Factors_thres[abs(Rotated_Factors_thres) < MIN_VALUE]<-NA
 colnames(Rotated_Factors_thres)<- colnames(Rotated_Factors)
 rownames(Rotated_Factors_thres)<- rownames(Rotated_Factors)
-
 print(Rotated_Factors_thres, scale=TRUE)
 
 ## Step 6:  Save factor scores 
@@ -109,9 +92,13 @@ print(t(head(NEW_ProjectData, 10)), scale=TRUE)
 
 # Part 2: Customer Segmentation 
 # Please ENTER then original raw attributes to use for the segmentation (the "segmentation attributes")
-# Please use numbers, not column names, e.g. c(1:5, 7, 8) uses columns 1,2,3,4,5,7,8
-#segmentation_attributes_used = c(29,17,24,14,8,9,22,7,20,3,12,27,18) 
-segmentation_attributes_used = c(2:10, 12:21, 23:25, 29:ncol(ProjectData))
+# 
+# 
+# YearsAtCompany
+
+colnames <- colnames(ProjectData)
+attribute_names <- c("YearsInCurrentRole", "YearsWithCurrManager", "YearsSinceLastPromotion", "TotalWorkingYears", "JobLevel", "MonthlyIncome", "Department", "PerformanceRating", "EducationField", "DistanceFromHome", "Education", "PercentSalaryHike", "Age", "JobRole", "NumCompaniesWorked")
+segmentation_attributes_used = match(attribute_names, colnames(ProjectData))
 profile_attributes_used = segmentation_attributes_used
 numb_clusters_used = 6
 
@@ -132,7 +119,6 @@ ProjectData_profile <- ProjectData[,profile_attributes_used]
 ProjectData_scaled <- apply(ProjectData, 2, function(r) if (sd(r)!=0) (r-mean(r))/sd(r) else 0*r)
 
 ## Step 3. Select Segmentation Variables
-
 euclidean_pairwise <- as.matrix(dist(head(ProjectData_segment, max_data_report), method="euclidean"))
 euclidean_pairwise <- euclidean_pairwise*lower.tri(euclidean_pairwise) + euclidean_pairwise*diag(euclidean_pairwise) + 10e10*upper.tri(euclidean_pairwise)
 euclidean_pairwise[euclidean_pairwise==10e10] <- NA
@@ -153,9 +139,9 @@ Hierarchical_Cluster_distances <- dist(ProjectData_segment, method=distance_used
 Hierarchical_Cluster <- hclust(Hierarchical_Cluster_distances, method=hclust_method)
 # Display dendogram
 
-#
-hcd <- as.dendrogram(Hierarchical_Cluster)
-plot(hcd)
+# Literally never again
+# hcd <- as.dendrogram(Hierarchical_Cluster)
+# plot(hcd)
 #rect.hclust(Hierarchical_Cluster, k=numb_clusters_used, border="red") 
 
 # TODO: Draw dendogram with red borders around the 3 clusters
@@ -168,20 +154,23 @@ iplot.df(melt(head(df1, 30), id="index"), xlab="Number of Components", ylab = "D
 cluster_memberships_hclust <- as.vector(cutree(Hierarchical_Cluster, k=numb_clusters_used)) # cut tree into as many clusters as numb_clusters_used
 cluster_ids_hclust=unique(cluster_memberships_hclust)
 
-ProjectData_with_hclust_membership <- cbind(1:length(cluster_memberships_hclust),cluster_memberships_hclust)
-colnames(ProjectData_with_hclust_membership)<-c("Observation Number","Cluster_Membership")
-
-iprint.df(round(head(ProjectData_with_hclust_membership, max_data_report), 2))
+ProjectData_with_hclust_membership <- cbind(ProjectData, cluster=cluster_memberships_hclust)
+hclust_data <- as.data.frame(ProjectData_with_hclust_membership)
+write.csv(ProjectData_with_kmeans_membership, "output/hclust.csv")
+table(hclust_data$cluster, hclust_data$Is_Resigning)
 
 kmeans_clusters <- kmeans(ProjectData_segment,centers= numb_clusters_used, iter.max=2000, algorithm=kmeans_method)
+ProjectData_with_kmeans_membership <- cbind(ProjectData,cluster =kmeans_clusters$cluster)
+kmeans_data <- as.data.frame(ProjectData_with_kmeans_membership)
+write.csv(ProjectData_with_kmeans_membership, "output/kmeans.csv")
 
-ProjectData_with_kmeans_membership <- cbind(1:length(kmeans_clusters$cluster),kmeans_clusters$cluster)
-colnames(ProjectData_with_kmeans_membership)<-c("Observation Number","Cluster_Membership")
-
-iprint.df(round(head(ProjectData_with_kmeans_membership, max_data_report), 2))
 
 cluster_memberships_kmeans <- kmeans_clusters$cluster 
 cluster_ids_kmeans <- unique(cluster_memberships_kmeans)
+
+data <- read.csv("output/kmeans.csv", na.strings=c(""," ","NA"), header=TRUE) # Loading data
+data <- clean(data)
+desc <- describeBy(data, data$cluster, mat = TRUE)
 
 if (profile_with == "hclust"){
   cluster_memberships <- cluster_memberships_hclust
@@ -203,7 +192,7 @@ if (ncol(ProjectData_profile) <2)
 colnames(Cluster_Profile_mean) <- paste("Seg.", 1:length(cluster_ids), sep="")
 cluster.profile <- cbind (population_average,Cluster_Profile_mean)
 
-iprint.df(round(cluster.profile, 2))
+print(round(cluster.profile, 2))
 
 ProjectData_scaled_profile = ProjectData_scaled[, profile_attributes_used,drop=F]
 
@@ -219,14 +208,14 @@ cluster_profile_ratios <- (ifelse(population_average_matrix==0, 0,Cluster_Profil
 colnames(cluster_profile_ratios) <- paste("Seg.", 1:ncol(cluster_profile_ratios), sep="")
 rownames(cluster_profile_ratios) <- colnames(ProjectData)[profile_attributes_used]
 ## printing the result in a clean-slate table
-iprint.df(round(cluster_profile_ratios-1, 2))
+print(round(cluster_profile_ratios-1, 2))
 
 Rotated_Factors_thresx <- cluster_profile_ratios-1
 Rotated_Factors_thresx[abs(Rotated_Factors_thresx) < 0.1]<-NA
 colnames(Rotated_Factors_thresx)<- colnames(cluster_profile_ratios)
 rownames(Rotated_Factors_thresx)<- rownames(cluster_profile_ratios)
 
-iprint.df(round(Rotated_Factors_thresx, 2))
+print(round(Rotated_Factors_thresx, 2))
 
 #ProjectData_with_hclust_membership
 #as.data.frame(table(ProjectData_with_hclust_membership))

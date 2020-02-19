@@ -10,37 +10,17 @@ training <- split_data$training
 validation <- split_data$validation
 testing <- split_data$testing
 
-avg_probability <- mean(training$Is_Resigning == "1")
 ##
 ## Defining the model using ctree
 #
 
-predictCTree <- function(training, testing, p) {
-  ctree_tree<-ctree(variable,data=training)
-  ctree_probabilities<-predict(ctree_tree,newdata=testing,type="prob") 
-  probabilities <- ctree_probabilities[,2]
-  
-  classification <- rep("1", nrow(testing))
-  classification[probabilities < p] = "0"
-  classification <- as.factor(classification)
-  
-  return(list(probabilities = probabilities, classification = classification))
-}
-
-ctree_tree<-ctree(variable,data=training)
-ctree_probabilities<-predict(ctree_tree,newdata=validation,type="prob") 
-probabilities <- ctree_probabilities[,2]
-classification <- rep("1", nrow(validation))
-
-classification[probabilities < avg_probability] = "0"
-classification <- as.factor(classification)
-
-prediction <- predictCTree(training, validation, avg_probability)
-
+variable <- Is_Resigning~ YearsAtCompany + YearsInCurrentRole + YearsWithCurrManager + YearsSinceLastPromotion + TotalWorkingYears + JobLevel + MonthlyIncome + Department + PerformanceRating + EducationField + DistanceFromHome + Education + PercentSalaryHike + Age + JobRole + NumCompaniesWorked
+avg_probability <- mean(training$Is_Resigning == "1")
+prediction <- predictCTree(variable, training, validation, avg_probability)
 confusionMatrix(prediction$classification,validation$Is_Resigning, positive = "1")
 
 # ROC Curve
-ROC_prediction <- prediction(probabilities, validation$Is_Resigning)
+ROC_prediction <- prediction(prediction$probabilities, validation$Is_Resigning)
 ROC <- performance(ROC_prediction,"tpr","fpr") # Create ROC curve data
 plot(ROC) # Plot ROC curve
 
