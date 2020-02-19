@@ -1,0 +1,90 @@
+if("pacman" %in% rownames(installed.packages()) == FALSE) {install.packages("pacman")}
+pacman::p_load("caret","ROCR","lift","glmnet","MASS","e1071", "pracma", "dplyr", "partykit", "xgboost")
+source("helper_functions.r")
+library(stringr)
+library(dplyr)
+
+
+##
+## Fixing bad data
+##
+
+data <- read.csv(file.choose(), na.strings=c(""," ","NA"), header=TRUE) # Loading data
+data <- clean(data)
+
+##
+## Separating the data
+##
+
+training_pct <- 0.9
+size_all <- nrow(data)
+size_training <- size_all * training_pct
+size_testing <- size_all * (1 - training_pct)
+
+set.seed(77850) 
+inTrain <- createDataPartition(y = data$default_0,
+                               p = training_pct, list = FALSE)
+training <- data[ inTrain,]
+testing <- data[ -inTrain,]
+
+##
+## Defining the model using logistic (previously used stepAIC)
+##
+
+model <- glm(default_0 ~ LIMIT_BAL + SEX + EDUCATION + MARRIAGE + AGE + PAY_1 + PAY_3 + PAY_4 + PAY_5 + PAY_6 + BILL_AMT3 + PAY_AMT1 + PAY_AMT2 + PAY_AMT4 + PAY_AMT5 + PAY_AMT3, data=training, family="binomial"(link="logit"))
+
+##
+## Prediction of test data
+##
+
+logistic_probabilities <- predict(model, newdata=testing, type="response")
+logistic_classification <- rep("1", nrow(testing))
+
+avg_probability <- mean(training$default_0 == "1")
+logistic_classification[logistic_probabilities < avg_probability] = "0"
+logistic_classification <- as.factor(logistic_classification)
+confusionMatrix(logistic_classification,testing$default_0, positive = "1")
+
+# ROC Curve
+logistic_ROC_prediction <- prediction(logistic_probabilities, testing$default_0)
+logistic_ROC <- performance(logistic_ROC_prediction,"tpr","fpr") # Create ROC curve data
+plot(logistic_ROC) # Plot ROC curve
+
+# AUC (area under curve)
+    # 90+% - excellent, 80-90% - very good, 70-80% - good, 60-70% - so so, below 60% - not much value
+auc.tmp <- performance(logistic_ROC_prediction,"auc") #Create AUC data
+logistic_auc_testing <- as.numeric(auc.tmp@y.values) #Calculate AUC
+logistic_auc_testing
+
+# Lift chart
+plotLift(logistic_probabilities, testing$default_0, cumulative = TRUE, n.buckets = 10)
+
+##
+## Prediction of final data
+##
+
+# Cleaning
+final_data <- read.csv(file.choose(), na.strings=c(""," ","NA"), header=TRUE) # Loading data
+final_data <- clean(final_data)
+
+# Prediction
+logistic_probabilities <- predict(model, newdata=final_data, type="response")
+
+# Classification
+logistic_classification <- rep("1", nrow(final_data))
+avg_probability <- mean(training$default_0 == "1")
+logistic_classification[logistic_probabilities < avg_probability] = "0"
+logistic_classification <- as.factor(logistic_classification)
+
+# Issue Credit?
+issue_credit <- rep("0", nrow(final_data))
+issue_credit[logistic_classification == "0"] = "1"
+
+df <- data.frame(
+  id = final_data$ID,
+  probability = logistic_probabilities,
+  classification = logistic_classification,
+  issue_credit = issue_credit
+)
+
+write.csv(df, file = "FinalizedPredictions.csv")

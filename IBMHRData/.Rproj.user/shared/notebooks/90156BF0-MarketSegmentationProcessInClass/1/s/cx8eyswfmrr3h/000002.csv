@@ -1,0 +1,4 @@
+"0","# Please enter the minimum number below which you would like not to print - this makes the readability of the tables easier. Default values are either 10e6 (to print everything) or 0.5. Try both to see the difference."
+"0","MIN_VALUE = 0.5"
+"0","# Please enter the maximum number of observations to show in the report and slides. "
+"0","max_data_report = 10"

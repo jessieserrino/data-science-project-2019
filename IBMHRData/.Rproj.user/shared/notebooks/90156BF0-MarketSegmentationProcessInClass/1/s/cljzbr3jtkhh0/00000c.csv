@@ -1,0 +1,2 @@
+"0","#write.csv(round(Variance_Explained_Table,2), file = ""Variance_Explained_Table.csv"")"
+"0",""

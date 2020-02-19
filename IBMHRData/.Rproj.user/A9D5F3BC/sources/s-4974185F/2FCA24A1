@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1582012530435.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "2FCA24A1",
+    "lastKnownWriteTime" : 1582021235,
+    "last_content_update" : 1582021235586,
+    "path" : "~/Code/IBMHRData/classification.R",
+    "project_path" : "classification.R",
+    "properties" : {
+        "cursorPosition" : "113,0",
+        "scrollLine" : "99"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

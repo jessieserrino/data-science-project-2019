@@ -1,0 +1,7 @@
+"0","# Here is how we use the `PCA` function "
+"0","Variance_Explained_Table_results<-PCA(ProjectDataFactor, graph=FALSE)"
+"0","Variance_Explained_Table<-Variance_Explained_Table_results$eig"
+"0","Variance_Explained_Table_copy<-Variance_Explained_Table"
+"0",""
+"0","rownames(Variance_Explained_Table) <- paste(""Component"", 1:nrow(Variance_Explained_Table), sep="" "")"
+"0","colnames(Variance_Explained_Table) <- c(""Eigenvalue"", ""Pct of explained variance"", ""Cumulative pct of explained variance"")"

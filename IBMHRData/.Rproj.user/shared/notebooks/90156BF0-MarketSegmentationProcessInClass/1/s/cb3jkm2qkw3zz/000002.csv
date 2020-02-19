@@ -1,0 +1,3 @@
+"0","factor_attributes_used <- intersect(factor_attributes_used, 1:ncol(ProjectData))"
+"0","ProjectDataFactor <- ProjectData[,factor_attributes_used]"
+"0","ProjectDataFactor <- data.matrix(ProjectDataFactor)"

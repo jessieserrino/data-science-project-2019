@@ -1,0 +1,90 @@
+fixNAs <- function(data_frame){
+  integer_reac<-0
+  factor_reac<-"FIXED_NA"
+  character_reac<-"FIXED_NA"
+  date_reac<-as.Date("1900-01-01")
+  
+  for (i in 1 : ncol(data_frame)){
+    if (class(data_frame[,i]) %in% c("numeric","integer")) {
+      if (any(is.na(data_frame[,i]))){
+        data_frame[,paste0(colnames(data_frame)[i],"_surrogate")]<-
+          as.factor(ifelse(is.na(data_frame[,i]),"1","0"))
+        data_frame[is.na(data_frame[,i]),i]<-integer_reac
+      }
+    } else
+      if (class(data_frame[,i]) %in% c("factor")) {
+        if (any(is.na(data_frame[,i]))){
+          data_frame[,i]<-as.character(data_frame[,i])
+          data_frame[,paste0(colnames(data_frame)[i],"_surrogate")]<-
+            as.factor(ifelse(is.na(data_frame[,i]),"1","0"))
+          data_frame[is.na(data_frame[,i]),i]<-factor_reac
+          data_frame[,i]<-as.factor(data_frame[,i])
+          
+        } 
+      } else {
+        if (class(data_frame[,i]) %in% c("character")) {
+          if (any(is.na(data_frame[,i]))){
+            data_frame[,paste0(colnames(data_frame)[i],"_surrogate")]<-
+              as.factor(ifelse(is.na(data_frame[,i]),"1","0"))
+            data_frame[is.na(data_frame[,i]),i]<-character_reac
+          }  
+        } else {
+          if (class(data_frame[,i]) %in% c("Date")) {
+            if (any(is.na(data_frame[,i]))){
+              data_frame[,paste0(colnames(data_frame)[i],"_surrogate")]<-
+                as.factor(ifelse(is.na(data_frame[,i]),"1","0"))
+              data_frame[is.na(data_frame[,i]),i]<-date_reac
+            }
+          }  
+        }       
+      }
+  } 
+  return(data_frame) 
+}
+
+clean <- function(data_frame) {
+  data_frame$SEX <- as.factor(data_frame$SEX)
+  
+  # EDUCATION (0 and 6 values are corrected to 5, unknown)
+  data_frame$EDUCATION[data_frame$EDUCATION <= 0] <- 5
+  data_frame$EDUCATION[data_frame$EDUCATION > 4] <- 4
+  data_frame$EDUCATION <- as.factor(data_frame$EDUCATION)
+  
+  # MARRIAGE (0 values are corrected to 3, other)
+  data_frame$MARRIAGE[data_frame$MARRIAGE <= 0] <- 3
+  data_frame$MARRIAGE[data_frame$MARRIAGE >= 3] <- 3
+  data_frame$MARRIAGE <- as.factor(data_frame$MARRIAGE)
+  
+  data_frame$PAY_1[data_frame$PAY_1 <= 0] <- 0
+  data_frame$PAY_2[data_frame$PAY_2 <= 0] <- 0
+  data_frame$PAY_3[data_frame$PAY_3 <= 0] <- 0
+  data_frame$PAY_4[data_frame$PAY_4 <= 0] <- 0
+  data_frame$PAY_5[data_frame$PAY_5 <= 0] <- 0
+  data_frame$PAY_6[data_frame$PAY_6 <= 0] <- 0
+  
+  data_frame$PAY_1 <- as.factor(data_frame$PAY_1)
+  data_frame$PAY_2 <- as.factor(data_frame$PAY_2)
+  data_frame$PAY_3 <- as.factor(data_frame$PAY_3)
+  data_frame$PAY_4 <- as.factor(data_frame$PAY_4)
+  data_frame$PAY_5 <- as.factor(data_frame$PAY_5)
+  data_frame$PAY_6 <- as.factor(data_frame$PAY_6)
+  data_frame$PAY_AMT1 <- as.numeric(data_frame$PAY_AMT1)
+  data_frame$PAY_AMT2 <- as.numeric(data_frame$PAY_AMT2)
+  data_frame$PAY_AMT3 <- as.numeric(data_frame$PAY_AMT3)
+  data_frame$PAY_AMT4 <- as.numeric(data_frame$PAY_AMT4)
+  data_frame$PAY_AMT5 <- as.numeric(data_frame$PAY_AMT5)
+  data_frame$PAY_AMT6 <- as.numeric(data_frame$PAY_AMT6)
+  
+  if (!is.null(data_frame$default_0)) { 
+    data_frame$default_0 <- as.factor(data_frame$default_0)
+  }
+  
+  # Feature Scaling
+  Scalable_Rows <- c("LIMIT_BAL", "AGE", "BILL_AMT1", "BILL_AMT2", "BILL_AMT3", "BILL_AMT4", "BILL_AMT5", "BILL_AMT6", "BILL_AMT1", "PAY_AMT1", "PAY_AMT2", "PAY_AMT3", "PAY_AMT4", "PAY_AMT5", "PAY_AMT6")
+  data_frame <- data_frame %>% mutate_at(Scalable_Rows, ~(scale(.) %>% as.vector))
+  
+  # Fixing NAs
+  data_frame<-fixNAs(data_frame)
+
+  return(data_frame)
+}

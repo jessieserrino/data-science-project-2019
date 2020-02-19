@@ -1,0 +1,4 @@
+"0","eigenvalues  <- Variance_Explained_Table[, ""Eigenvalue""]"
+"0","df           <- cbind(as.data.frame(eigenvalues), c(1:length(eigenvalues)), rep(1, length(eigenvalues)))"
+"0","colnames(df) <- c(""eigenvalues"", ""components"", ""abline"")"
+"0","iplot.df(melt(df, id=""components""))"

@@ -1,0 +1,5 @@
+"0","# Here is how the `principal` function is used "
+"0","UnRotated_Results<-principal(ProjectDataFactor, nfactors=ncol(ProjectDataFactor), rotate=""none"",score=TRUE)"
+"0","UnRotated_Factors<-round(UnRotated_Results$loadings,2)"
+"0","UnRotated_Factors<-as.data.frame(unclass(UnRotated_Factors))"
+"0","colnames(UnRotated_Factors)<-paste(""Comp"",1:ncol(UnRotated_Factors),sep="""")"

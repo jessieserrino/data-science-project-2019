@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1581936965886.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "E7C50808",
+    "lastKnownWriteTime" : 1582019927,
+    "last_content_update" : 1582019927235,
+    "path" : "~/Code/IBMHRData/helper_functions.R",
+    "project_path" : "helper_functions.R",
+    "properties" : {
+        "cursorPosition" : "70,1",
+        "scrollLine" : "24"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

@@ -1,0 +1,6 @@
+"0","kmeans_clusters <- kmeans(ProjectData_segment,centers= numb_clusters_used, iter.max=2000, algorithm=kmeans_method)"
+"0",""
+"0","ProjectData_with_kmeans_membership <- cbind(1:length(kmeans_clusters$cluster),kmeans_clusters$cluster)"
+"0","colnames(ProjectData_with_kmeans_membership)<-c(""Observation Number"",""Cluster_Membership"")"
+"0",""
+"0","iprint.df(round(head(ProjectData_with_kmeans_membership, max_data_report), 2))"

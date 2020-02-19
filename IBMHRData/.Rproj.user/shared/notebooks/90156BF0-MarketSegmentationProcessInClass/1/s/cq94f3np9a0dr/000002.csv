@@ -1,0 +1,7 @@
+"0","cluster_memberships_hclust <- as.vector(cutree(Hierarchical_Cluster, k=numb_clusters_used)) # cut tree into as many clusters as numb_clusters_used"
+"0","cluster_ids_hclust=unique(cluster_memberships_hclust)"
+"0",""
+"0","ProjectData_with_hclust_membership <- cbind(1:length(cluster_memberships_hclust),cluster_memberships_hclust)"
+"0","colnames(ProjectData_with_hclust_membership)<-c(""Observation Number"",""Cluster_Membership"")"
+"0",""
+"0","iprint.df(round(head(ProjectData_with_hclust_membership, max_data_report), 2))"

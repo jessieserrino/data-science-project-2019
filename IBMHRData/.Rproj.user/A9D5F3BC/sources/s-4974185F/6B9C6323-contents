@@ -1,0 +1,573 @@
+---
+title: "IBM HR Project"
+author: "20J Group 8: Martin, Aisling, Magno, Antoine, Jessie, Joe"
+output:
+  html_document:
+    css: ../../AnalyticsStyles/default.css
+    theme: paper
+    toc: yes
+    toc_float:
+      collapsed: no
+      smooth_scroll: yes
+  pdf_document:
+    includes:
+      in_header: ../../AnalyticsStyles/default.sty
+always_allow_html: yes
+---
+
+```{r setuplibraries, echo=FALSE, message=FALSE}
+suppressWarnings(source("library.R"))
+# Package options
+suppressWarnings(ggthemr('fresh'))  # ggplot theme
+opts_knit$set(progress=FALSE, verbose=FALSE)
+opts_chunk$set(echo=FALSE, fig.align="center", fig.width=10, fig.height=6.35, results="asis")
+options(knitr.kable.NA = '')
+
+# New versions of the networkD3 package may not work properly, so install the following version
+#packageurl <- "https://cran.r-project.org/src/contrib/Archive/networkD3/networkD3_0.2.13.tar.gz"
+#install.packages(packageurl, repos=NULL, type="source")
+if("pacman" %in% rownames(installed.packages()) == FALSE) {install.packages("pacman")}
+pacman::p_load("caret", "dplyr", "e1071", "glmnet","lift","MASS", "ROCR", "partykit", "pracma","xgboost")
+library(stringr)
+library(dplyr)
+source("helper_functions.r")
+```
+
+
+# The Data
+
+```{r setupdata1E, echo=TRUE, tidy=TRUE}
+# Please enter the minimum number below which you would like not to print - this makes the readability of the tables easier. Default values are either 10e6 (to print everything) or 0.5. Try both to see the difference.
+MIN_VALUE = 0.5
+# Please enter the maximum number of observations to show in the report and slides. 
+max_data_report = 10
+```
+
+```{r}
+ProjectData <- read.csv("IBMHRData.csv", na.strings=c(""," ","NA"), header=TRUE) # Loading data
+ProjectData <- clean(ProjectData)
+ProjectData <- data.matrix(ProjectData) 
+ProjectData_INITIAL <- ProjectData
+```
+
+# Part 1: Key Customer Characteristics
+
+```{r setupfactor, echo=TRUE, tidy=TRUE}
+# Please ENTER the original raw attributes to use. 
+# Please use numbers, not column names, e.g. c(1:5, 7, 8) uses columns 1,2,3,4,5,7,8
+factor_attributes_used = c(2:ncol(ProjectData)) # for BOATS Data
+
+# Please ENTER the selection criteria for the factors to use. 
+# Choices: "eigenvalue", "variance", "manual"
+#factor_selectionciterion = "manual"
+factor_selectionciterion = "eigenvalue"
+#factor_selectionciterion = "variance"
+
+# Please ENTER the desired minumum variance explained 
+# (Only used in case "variance" is the factor selection criterion used). 
+minimum_variance_explained = 65  # between 1 and 100
+
+# Please ENTER the number of factors to use 
+# (Only used in case "manual" is the factor selection criterion used).
+manual_numb_factors_used = 6
+
+# Please ENTER the rotation eventually used (e.g. "none", "varimax", "quatimax", "promax", "oblimin", "simplimax", and "cluster" - see help(principal)). Default is "varimax"
+rotation_used = "varimax"
+
+```
+
+```{r}
+factor_attributes_used <- intersect(factor_attributes_used, 1:ncol(ProjectData))
+ProjectDataFactor <- ProjectData[,factor_attributes_used]
+ProjectDataFactor <- data.matrix(ProjectDataFactor)
+```
+
+## Steps 1-2: Check the Data 
+
+Start by some basic visual exploration of, say, a few data:
+
+```{r}
+rownames(ProjectDataFactor) <- paste0("Obs.", sprintf("%02i", 1:nrow(ProjectDataFactor)))
+iprint.df(t(head(round(ProjectDataFactor, 2), max_data_report)))
+```
+
+The data we use here have the following descriptive statistics: 
+
+```{r}
+iprint.df(round(my_summary(ProjectDataFactor), 2))
+```
+
+## Step 3: Check Correlations
+
+This is the correlation matrix of all the variables:
+
+```{r}
+thecor = round(cor(ProjectDataFactor),2)
+#iprint.df(round(thecor,2), scale=TRUE)
+thecor_thres <- thecor
+thecor_thres[abs(thecor_thres) < MIN_VALUE]<-NA
+colnames(thecor_thres)<- colnames(thecor)
+rownames(thecor_thres)<- rownames(thecor)
+
+iprint.df(thecor_thres, scale=TRUE)
+#write.csv(thecor_thres, file = "thecor_thres.csv")
+```
+
+## Step 4: Choose number of factors
+
+```{r}
+# Here is how the `principal` function is used 
+UnRotated_Results<-principal(ProjectDataFactor, nfactors=ncol(ProjectDataFactor), rotate="none",score=TRUE)
+UnRotated_Factors<-round(UnRotated_Results$loadings,2)
+UnRotated_Factors<-as.data.frame(unclass(UnRotated_Factors))
+colnames(UnRotated_Factors)<-paste("Comp",1:ncol(UnRotated_Factors),sep="")
+```
+
+```{r}
+# Here is how we use the `PCA` function 
+Variance_Explained_Table_results<-PCA(ProjectDataFactor, graph=FALSE)
+Variance_Explained_Table<-Variance_Explained_Table_results$eig
+Variance_Explained_Table_copy<-Variance_Explained_Table
+
+rownames(Variance_Explained_Table) <- paste("Component", 1:nrow(Variance_Explained_Table), sep=" ")
+colnames(Variance_Explained_Table) <- c("Eigenvalue", "Pct of explained variance", "Cumulative pct of explained variance")
+```
+
+Let's look at the **variance explained** as well as the **eigenvalues** (see session readings):
+
+```{r}
+iprint.df(round(Variance_Explained_Table, 2))
+#write.csv(round(Variance_Explained_Table,2), file = "Variance_Explained_Table.csv")
+
+```
+
+```{r}
+eigenvalues  <- Variance_Explained_Table[, "Eigenvalue"]
+df           <- cbind(as.data.frame(eigenvalues), c(1:length(eigenvalues)), rep(1, length(eigenvalues)))
+colnames(df) <- c("eigenvalues", "components", "abline")
+iplot.df(melt(df, id="components"))
+```
+
+## Step 5: Interpret the factors
+
+Let's now see how the "top factors" look like. 
+
+```{r}
+if (factor_selectionciterion == "eigenvalue")
+  factors_selected = sum(Variance_Explained_Table_copy[,1] >= 1)
+if (factor_selectionciterion == "variance")
+  factors_selected = 1:head(which(Variance_Explained_Table_copy[,"cumulative percentage of variance"]>= minimum_variance_explained),1)
+if (factor_selectionciterion == "manual")
+  factors_selected = manual_numb_factors_used
+```
+
+To better visualize them, we will use what is called a "rotation". There are many rotation methods. In this case we selected the `r rotation_used` rotation. For our data, the `r factors_selected` selected factors look as follows after this rotation: 
+
+```{r}
+Rotated_Results<-principal(ProjectDataFactor, nfactors=max(factors_selected), rotate=rotation_used,score=TRUE)
+Rotated_Factors<-round(Rotated_Results$loadings,2)
+Rotated_Factors<-as.data.frame(unclass(Rotated_Factors))
+colnames(Rotated_Factors)<-paste("Comp.",1:ncol(Rotated_Factors),sep="")
+
+sorted_rows <- sort(Rotated_Factors[,1], decreasing = TRUE, index.return = TRUE)$ix
+Rotated_Factors <- Rotated_Factors[sorted_rows,]
+
+iprint.df(Rotated_Factors, scale=TRUE)
+#write.csv(Rotated_Factors, file = "Rotated_Factors.csv")
+
+```
+
+To better visualize and interpret the factors we often "suppress" loadings with small values, e.g. with absolute values smaller than 0.5. In this case our factors look as follows after suppressing the small numbers:
+
+```{r}
+Rotated_Factors_thres <- Rotated_Factors
+Rotated_Factors_thres[abs(Rotated_Factors_thres) < MIN_VALUE]<-NA
+colnames(Rotated_Factors_thres)<- colnames(Rotated_Factors)
+rownames(Rotated_Factors_thres)<- rownames(Rotated_Factors)
+
+iprint.df(Rotated_Factors_thres, scale=TRUE)
+#write.csv(Rotated_Factors_thres, file = "Rotated_Factors_thres.csv")
+
+```
+
+## Step 6:  Save factor scores 
+
+We can now either replace all initial variables used in this part with the factor scores, or just select one of the initial variables for each of the selected factors in order to represent that factor. Here is how the factor scores  are for the first few respondents:
+
+```{r}
+NEW_ProjectData <- round(Rotated_Results$scores[,1:factors_selected,drop=F],2)
+colnames(NEW_ProjectData)<-paste("Component(Factor)",1:ncol(NEW_ProjectData),sep=" ")
+
+iprint.df(t(head(NEW_ProjectData, 10)), scale=TRUE)
+#write.csv(NEW_ProjectData, file = "FactorScores.csv")
+
+```
+
+**Questions**
+
+>
+Comp.1: YearsInCurrentRole (29) 
+Comp.2: MonthlyIncome (17)
+Comp.3: StockOptionLevel/Marital status (24) 
+Comp.4: JobRole (14)
+Comp.5: EducationField (8)
+Comp.6: EnvironmentSatisfaction (9)
+Comp.7: PerformanceRating (22)
+Comp.8: Education (7)
+Comp.9: OverTime (20)
+Comp.10: BusinessTravel (3)
+Comp.11: JobInvolvement (12)
+Comp.12: WorkLifeBalance (27)
+Comp.13: MonthlyRate (18)
+
+
+
+# Part 2: Customer Segmentation 
+
+```{r setupcluster, echo=TRUE, tidy=TRUE}
+# Please ENTER then original raw attributes to use for the segmentation (the "segmentation attributes")
+# Please use numbers, not column names, e.g. c(1:5, 7, 8) uses columns 1,2,3,4,5,7,8
+segmentation_attributes_used = c(29,17,24,14,8,9,22,7,20,3,12,27,18) 
+#segmentation_attributes_used = c(2:ncol(ProjectData)) 
+
+
+#Factor 1: "The Active Adventurer" we can replaced the factor with the question Q1.18
+#Factor 2: "The Obsessed" we can replaced the factor with the question Q1.28
+#Factor 3: "The Image Conscious" we can replaced the factor with the question Q1.9
+#Factor 4: "The Brand Aware" we can replaced the factor with the question Q1.4
+#Factor 5: "The Price Sensitive" we can replaced the factor with the question 
+#Factor 6: "The Tinkerer" we can replaced the factor with the question Q1.11
+
+# Please ENTER then original raw attributes to use for the profiling of the segments (the "profiling attributes")
+# Please use numbers, not column names, e.g. c(1:5, 7, 8) uses columns 1,2,3,4,5,7,8
+profile_attributes_used = c(29,17,24,14,8,9,22,7,20,3,12,27,18) 
+#profile_attributes_used = c(2:ncol(ProjectData)) # Do not change, otherwise BUG
+#profile_attributes_used = c(19,29,10,5,3,12,30:82) # Do not change, otherwise BUG
+
+# Please ENTER the number of clusters to eventually use for this report
+#numb_clusters_used = 7 # for boats possibly use 5, for Mall_Visits use 3
+numb_clusters_used = 6 # for boats possibly use 5, for Mall_Visits use 3
+
+# Please enter the method to use for the segmentation:
+profile_with = "hclust" #  "hclust" or "kmeans"
+#profile_with = "kmeans"
+
+# Please ENTER the distance metric eventually used for the clustering in case of hierarchical clustering 
+# (e.g. "euclidean", "maximum", "manhattan", "canberra", "binary" or "minkowski" - see help(dist)). 
+# DEFAULT is "euclidean"
+distance_used = "euclidean"
+
+# Please ENTER the hierarchical clustering method to use (options are:
+# "ward", "single", "complete", "average", "mcquitty", "median" or "centroid").
+# DEFAULT is "ward"
+#hclust_method = "ward.D"
+hclust_method = "ward.D"
+
+# Please ENTER the kmeans clustering method to use (options are:
+# "Hartigan-Wong", "Lloyd", "Forgy", "MacQueen").
+# DEFAULT is "Lloyd"
+kmeans_method = "Lloyd"
+
+```
+
+```{r}
+# Same as the initial data
+ProjectData <- ProjectData_INITIAL
+
+segmentation_attributes_used <- intersect(segmentation_attributes_used, 1:ncol(ProjectData))
+profile_attributes_used <- intersect(profile_attributes_used, 1:ncol(ProjectData))
+
+ProjectData_segment <- ProjectData[,segmentation_attributes_used]
+ProjectData_profile <- ProjectData[,profile_attributes_used]
+
+ProjectData_scaled <- apply(ProjectData, 2, function(r) if (sd(r)!=0) (r-mean(r))/sd(r) else 0*r)
+```
+
+## Steps 1-2: Explore the data
+
+(This was done above, so we skip it)
+
+## Step 3. Select Segmentation Variables
+
+For simplicity will use one representative question for each of the factor we found in Part 1 (we can also use the "factor scores" for each respondent) to represent our survey respondents. These are the `segmentation_attributes_used` selected below. We can choose the question with the highest absolute factor loading for each factor. For example, when we use 5 factors with the varimax rotation we can select questions Q.1.9 (I see my boat as a status symbol), Q1.18 (Boating gives me a feeling of adventure), Q1.4 (I only consider buying a boat from a reputable brand), Q1.11 (I tend to perform minor boat repairs and maintenance on my own) and Q1.2 (When buying a boat  getting the lowest price is more important than the boat brand) - try it. These are columns 10, 19, 5, 12, and 3, respectively of the data matrix `Projectdata`. 
+
+## Step 4: Define similarity measure
+
+We need to define a distance metric that measures how different people (observations in general) are from each other. This can be an important choice. Here are the differences between the observations using the distance metric we selected:
+
+
+```{r}
+euclidean_pairwise <- as.matrix(dist(head(ProjectData_segment, max_data_report), method="euclidean"))
+euclidean_pairwise <- euclidean_pairwise*lower.tri(euclidean_pairwise) + euclidean_pairwise*diag(euclidean_pairwise) + 10e10*upper.tri(euclidean_pairwise)
+euclidean_pairwise[euclidean_pairwise==10e10] <- NA
+rownames(euclidean_pairwise) <- colnames(euclidean_pairwise) <- sprintf("Obs.%02d", 1:max_data_report)
+
+iprint.df(round(euclidean_pairwise))
+```
+
+## Step 5: Visualize Pair-wise Distances
+
+We can see the histogram of, say, the first 2 variables (can you change the code chunk in the raw .Rmd file to see other variables?)
+
+
+```{r}
+variables_to_plot = 1:2
+do.call(iplot.grid, lapply(variables_to_plot, function(n){
+  iplot.hist(ProjectData_segment[, n], breaks=10, xlab = paste("Variable", n))
+}))
+```
+
+or the histogram of all pairwise distances for the `r distance_used` distance:
+
+```{r}
+Pairwise_Distances <- dist(ProjectData_segment, method = distance_used) 
+#iplot.hist(Pairwise_Distances, breaks=10)
+```
+
+## Step 6: Method and Number of Segments
+
+We need to select the clustering method to use, as well as the number of cluster. It may be useful to see the dendrogram from Hierarchical Clustering, to have a quick idea of how the data may be segmented and how many segments there may be. Here is the dendrogram for our data:
+
+> **Team Comments:**
+>
+Hierarchical clustering establishes similarity pairs between customers. They are merged into larger groups. The heights of the branches indicate how different the clusters merged are to each others. We can infer from this graph a number of clusters we want to use and cut the tree as to create the desired number of clusters.
+
+
+```{r}
+gc()
+Hierarchical_Cluster_distances <- dist(ProjectData_segment, method=distance_used)
+Hierarchical_Cluster <- hclust(Hierarchical_Cluster_distances, method=hclust_method)
+# Display dendogram
+#iplot.dendrogram(Hierarchical_Cluster)
+
+#
+hcd <- as.dendrogram(Hierarchical_Cluster)
+#plot(hcd)
+#rect.hclust(Hierarchical_Cluster, k=numb_clusters_used, border="red") 
+
+# TODO: Draw dendogram with red borders around the 3 clusters
+
+```
+
+We can also plot the "distances" traveled before we need to merge any of the lower and smaller in size clusters into larger ones - the heights of the tree branches that link the clusters as we traverse the tree from its leaves to its root. If we have n observations, this plot has n-1 numbers, we see the first 20 here. 
+
+> **Team Comments:**
+> 
+We plot the height distances in function of the number of components. We want to try to set the number of clusters at the elbow of the plot in order to derive meaningful clusters. In this case, we would want to stop at either 3 or 6 clusters, because if we reduce, we would suffer a too large distance merger. Meaning that we would consider two different customers groups as similar where in fact their behaviors shows us the euclidean distance betweer the two is high.
+
+
+```{r}
+num <- nrow(ProjectData) - 1
+df1 <- cbind(as.data.frame(Hierarchical_Cluster$height[length(Hierarchical_Cluster$height):1]), c(1:num))
+colnames(df1) <- c("distances","index")
+iplot.df(melt(head(df1, 30), id="index"), xlab="Number of Components", ylab = "Distances")
+```
+
+Here is the segment membership of the first `r max_data_report` respondents if we use hierarchical clustering:
+
+> **Team Comments:**
+> 
+Membership plots below shows us to which cluster does your obersvation (or customer) belong to. It is limited to the first 10 customers. The 1st customer belong to cluster 1.
+
+```{r}
+cluster_memberships_hclust <- as.vector(cutree(Hierarchical_Cluster, k=numb_clusters_used)) # cut tree into as many clusters as numb_clusters_used
+cluster_ids_hclust=unique(cluster_memberships_hclust)
+
+ProjectData_with_hclust_membership <- cbind(1:length(cluster_memberships_hclust),cluster_memberships_hclust)
+colnames(ProjectData_with_hclust_membership)<-c("Observation Number","Cluster_Membership")
+
+iprint.df(round(head(ProjectData_with_hclust_membership, max_data_report), 2))
+#write.csv(round(ProjectData_with_hclust_membership, 2), file = "ProjectData_with_hclust_membership.csv")
+
+```
+
+while this is the segment membership if we use k-means:
+
+> **Team Comments:**
+>
+k-means clustering is a powerful clustering method, which aims to partition the observations into sets as to minimize the sum of within-cluster variances. We studied this in Marketing. In this method, we need first to define the number of clusters! (USER INPUT)
+>
+Note that in that case, customer membership is different than with hclust
+
+
+```{r}
+kmeans_clusters <- kmeans(ProjectData_segment,centers= numb_clusters_used, iter.max=2000, algorithm=kmeans_method)
+
+ProjectData_with_kmeans_membership <- cbind(1:length(kmeans_clusters$cluster),kmeans_clusters$cluster)
+colnames(ProjectData_with_kmeans_membership)<-c("Observation Number","Cluster_Membership")
+
+iprint.df(round(head(ProjectData_with_kmeans_membership, max_data_report), 2))
+write.csv(round(ProjectData_with_kmeans_membership, 2), file = "ProjectData_with_kmeans_membership.csv")
+
+```
+
+## Step 7: Profile and interpret the segments 
+
+In market segmentation one may use variables to **profile** the segments which are not the same (necessarily) as those used to **segment** the market: the latter may be, for example, attitude/needs related (you define segments based on what the customers "need"), while the former may be any information that allows a company to identify the defined customer segments (e.g. demographics, location, etc). Of course deciding which variables to use for segmentation and which to use for profiling (and then **activation** of the segmentation for business purposes) is largely subjective.  In this case we can use all survey questions for profiling for now - the `profile_attributes_used` variables selected below. 
+
+There are many ways to do the profiling of the segments. For example, here we show how the *average* answers of the respondents *in each segment* compare to the *average answer of all respondents* using the ratio of the two.  The idea is that if in a segment the average response to a question is very different (e.g. away from ratio of 1) than the overall average, then that question may indicate something about the segment relative to the total population. 
+Here are for example the profiles of the segments using the clusters found above.  First let's see just the average answer people gave to each question for the different segments as well as the total population:
+
+> **Team Comments:**
+>
+Based on the number of segments we defined (3 segments), we can see what answers do the customers give in each segment on average on the questions in the poll. We can either visualize it in a table, or in the snake plot below. We need to try different clusterings and iterate before deciding our clusters and segmentation 
+
+
+```{r}
+cluster_memberships_kmeans <- kmeans_clusters$cluster 
+cluster_ids_kmeans <- unique(cluster_memberships_kmeans)
+
+if (profile_with == "hclust"){
+  cluster_memberships <- cluster_memberships_hclust
+  cluster_ids <-  cluster_ids_hclust  
+}
+if (profile_with == "kmeans"){
+  cluster_memberships <- cluster_memberships_kmeans
+  cluster_ids <-  cluster_ids_kmeans
+}
+
+# WE WILL USE THESE IN THE CLASSIFICATION PART LATER
+NewData = matrix(cluster_memberships,ncol=1)
+
+population_average = matrix(apply(ProjectData_profile, 2, mean), ncol=1)
+colnames(population_average) <- "Population"
+Cluster_Profile_mean <- sapply(sort(cluster_ids), function(i) apply(ProjectData_profile[(cluster_memberships==i), ], 2, mean))
+if (ncol(ProjectData_profile) <2)
+  Cluster_Profile_mean=t(Cluster_Profile_mean)
+colnames(Cluster_Profile_mean) <- paste("Seg.", 1:length(cluster_ids), sep="")
+cluster.profile <- cbind (population_average,Cluster_Profile_mean)
+
+iprint.df(round(cluster.profile, 2))
+#write.csv(round(cluster.profile, 2), file = "cluster.profile.csv")
+
+```
+
+We can also "visualize" the segments using **snake plots** for each cluster. For example, we can plot the means of the profiling variables for each of our clusters to better visualize differences between segments. For better visualization we plot the standardized profiling variables.
+
+```{r}
+ProjectData_scaled_profile = ProjectData_scaled[, profile_attributes_used,drop=F]
+
+Cluster_Profile_standar_mean <- sapply(sort(cluster_ids), function(i) apply(ProjectData_scaled_profile[(cluster_memberships==i), ,drop = F], 2, mean))
+if (ncol(ProjectData_scaled_profile) < 2)
+  Cluster_Profile_standar_mean = t(Cluster_Profile_standar_mean)
+colnames(Cluster_Profile_standar_mean) <- paste("Seg ", 1:length(cluster_ids), sep="")
+
+iplot.df(melt(cbind.data.frame(idx=as.numeric(1:nrow(Cluster_Profile_standar_mean)), Cluster_Profile_standar_mean), id="idx"), xlab="Profiling variables (standardized)",  ylab="Mean of cluster")
+
+#write.csv(round(Cluster_Profile_standar_mean, 2), file = "Cluster_Profile_standar_mean.csv")
+
+```
+
+We can also compare the averages of the profiling variables of each segment relative to the average of the variables across the whole population. This can also help us better understand whether  there are indeed clusters in our data (e.g. if all segments are much like the overall population, there may be no segments). For example, we can measure the ratios of the average for each cluster to the average of the population, minus 1, (e.g. `avg(cluster)` `/` `avg(population)` `-1`) for each segment and variable:
+
+```{r}
+population_average_matrix <- population_average[,"Population",drop=F] %*% matrix(rep(1,ncol(Cluster_Profile_mean)),nrow=1)
+cluster_profile_ratios <- (ifelse(population_average_matrix==0, 0,Cluster_Profile_mean/population_average_matrix))
+colnames(cluster_profile_ratios) <- paste("Seg.", 1:ncol(cluster_profile_ratios), sep="")
+rownames(cluster_profile_ratios) <- colnames(ProjectData)[profile_attributes_used]
+## printing the result in a clean-slate table
+iprint.df(round(cluster_profile_ratios-1, 2))
+
+```
+
+
+> **Team Comments:**
+>
+We can also remove the averages of the profiling variables of each segment relative to the average of the variables across the whole population that are below 0.1 for readability purpose.
+
+```{r}
+Rotated_Factors_thresx <- cluster_profile_ratios-1
+Rotated_Factors_thresx[abs(Rotated_Factors_thresx) < 0.1]<-NA
+colnames(Rotated_Factors_thresx)<- colnames(cluster_profile_ratios)
+rownames(Rotated_Factors_thresx)<- rownames(cluster_profile_ratios)
+
+iprint.df(round(Rotated_Factors_thresx, 2))
+
+```
+
+> **Team Comments:**
+>
+We are trying to get a sense of the relative size of these clusters in function of the number of customers
+
+```{r}
+#ProjectData_with_hclust_membership
+#as.data.frame(table(ProjectData_with_hclust_membership))
+
+a <- table(ProjectData_with_hclust_membership)
+
+cluster1 <- a[names(a)==1]
+cluster2 <- a[names(a)==2]
+cluster3 <- a[names(a)==3]
+clustertotal <- cluster1 + cluster2 + cluster3
+cluster1p <- cluster1*100/(clustertotal)
+cluster2p <- cluster2*100/(clustertotal)
+cluster3p <- cluster3*100/(clustertotal)
+print(cluster1p)
+print(cluster2p)
+print(cluster3p)
+
+```
+
+**Questions**
+
+1. What do the numbers in the last table indicate? What numbers are the more informative?
+2. Based on the tables and snake plot above, what are some key features of each of the segments of this solution?
+
+> **Answers**
+>
+1. The numbers in the last table are a measure of the distance from the whole average of the answers that customers in a particular segment give to a specific question. This characteristic is shared by each member (customer) of the cluster. In simpler terms, they indicate how far does the specific segment responds to a question compared to the average. For example, if all customers tend to reply on average 1/5 at the first question, but the customers of the segment 1 reply 5/5, then the average of the profiling variables (question 1) of this segment 1, relative to the average of the variables across the whole population, will be very high. This tells us that the cluster 1 is very different than the others.
+>
+As a result, the numbers that are the most interesting for us are the large numbers in absolute value terms (i.e. as far as possible from 0). Any large number tells us that this cluster (segment) replies very differently to this question. We can then use this question as a key characteristic to segment the market.
+>
+2. We can infer some key features of each of the segment of our study based on the information above:
+>
+Segment 1: This group enjoys boating but are novices about boating and associated methodologies. They look to others for guidance and rely on others to help them in the enjoyment of boating. They would prefer to be part of a community and share boating with others
+>
+Segment 2: For this segment, boating is life both as a passion and as a symbol of their status. They are not only experts in the different types of boats and overall boating but they derive satisfaction out of giving others advice. This is the true hobbyist - and an “All Day I Dream about Boats” attitude. 
+>
+Segment 3: This segment is actually very close to segment 1: boating is not the end-all-be-all of life for them nor do they derive feelings of status from it, but what makes them different is that they like to tinker with the boat and do their own repairs. In this since, they are more a dabbler
+
+
+## Step 8: Robustness Analysis
+
+We should also consider the robustness of our analysis as we change the clustering method and parameters. Once we are comfortable with the solution we can finally answer our first business questions: 
+
+**Questions**
+
+1. How many segments are there in our market? How many do you select and why? Try a few and explain your final choice based on a) statistical arguments, b) on interpretation arguments, c) on business arguments (**you need to consider all three types of arguments**)
+2. Can you describe the segments you found based on the profiles?
+3. What if you change the number of factors and in general you *iterate the whole analysis*? **Iterations** are key in data science.
+4. Can you now answer the [Boats case questions](http://inseaddataanalytics.github.io/INSEADAnalytics/Boats-A-prerelease.pdf)? What business decisions do you recommend to this company based on your analysis?
+
+> **Answers**
+>
+1. From a business perspective, we see only two very different segments, with a third segment which can be integrated with another with a small variation. This lead us to the idea to create two distinct products: one "Leisure boat" and one "Professional boat".
+>
+As per the answer above, the Leisure boat would fit well with the segment 1 and 3, and the Professional boat would fit well with the segment 2. In order to discriminate with segment 1 and 3, we will create a "full care package" for a price, that we can sell independently of the boat. This full maintenance package allows us to discriminate between segment 1, who do not perform repair themselves, and segment 3, who like to repair their boats themselves.
+>
+However, we also run the analysis with 6 clusters and that gave us very interesting insights. Indeed, when running 6 clusters analysis (based on the curve above), we found out that some customers in the professional segment have sometimes different preferences. We then created "sub-segments" in the professional segment. One sub-segment is very price sensitive, younger on average, and care about power more than functionality and add-on tech. Another sub-segment is not price sensitive, categorize themselves as expert, want a powerful boat and see the boat and brand as a status symbol. We think we can sell to these professional customers a base boat "Pro", which is premium, powerful, branded, simple, relate with boating passion and managed cost. And offer an add-on package "Pro+", with multiple added functionality and tech, for the experts and to reward customers for their hard work.
+>
+In summary, we would create two main brands: "Leisure" and "Professional", with a variant "Professional+" with add-ons. With each purchase, we would offer the possibility of "full care coverage" for customers who don't like to repair their boat themselves.
+>
+2. See answers above
+>
+3. Repeating the analysis with different techniques (kmeans and hclust for example), gives us in general very similar results. There are some slight variations around snake plots and the averages of the profiling variables of each segment relative to the average of the variables across the whole population. However, in general, the clusters stay the same and give us the same insights. This is because we took the decision to generate only a limited number of clusters (3 clusters only), thus the variability decreases. If you increase the number of clusters, the reproducibility suffers and you are more susceptible to noise.
+>
+However, it is worthy to notice that many of the different methods for Hclustering did not work at all. For instance for average, centroid, single, the model was not able to converge and the output was not stable. The only method that worked was ward.D. With the kmeans method, all worked fine. Our hypothesis is that since kmeans is empirical, with a limited amount of clusters, the model always succeeds.
+>
+The choice of the factors that we select in Phase 1 for the clustering in phase 2 is critical. Indeed variations in this value brings immensely different results. For example, if we run the model without reducing the number of 29 questions, almost no questions significantly clusters the sample.
+>
+4. The segmentation exercise helped the company understand that they will need to create and position products aimed at the two strongly identified segments:
+>
+ ⁃ the North American market is, in size, largely made up of more amateur, dabbling folks who prefer to boat with others and consider themselves beginners
+ ⁃ That said, the status-driven, boating-as-identity folks are clearly defined segment and large enough to imply that there is some serious revenue to be made with this segment as they could be a high margin segment that cares a lot about the quality and brand
+>
+A market-segment prioritization strategy additionally depends on how the market landscape is with regards to competitors so without this information, we cannot advise on which segment to focus most on. In general, we see market opportunity in both.
+>
+Thus, we’d recommend creating products marketed separately to the two different segments: products built as the “Leisure” and “Professional”  with optional upgrades to both boat types that allow CreeqBoat to capture the sub-segments (such as younger, price-sensitive status-driven) more clearly. For example, full-level servicing and technology/digital upgrades are options to capture both those who need hand-holding, and separately, those who want all the latest and greatest in boating. 
+>
+Lastly, to answer the question “Should CreeqBoat enter the North American market?” and “Will entering North America help them turn around their revenue woes?” it would be necessary to know their current product offering and how costly it would be to invest in product and positioning changes to their existing product and marketing offerings. But this marketing segmentation exercise definitely will be valuable in defining their strategy.
+
+
+
+<hr>\clearpage
