@@ -66,7 +66,17 @@ auc.tmp <- performance(ROC_prediction,"auc") # Create AUC data
 auc_validation <- as.numeric(auc.tmp@y.values) # Calculate AUC
 auc_validation
 
-perf <- performance( pred, "tpr", "fpr" )
-perf2 <- performance(pred2, "tpr", "fpr")
-plot(perf, colorize = TRUE)
-plot(perf2, add = TRUE, colorize = TRUE)
+prediction_ctree <- predictCTree(variable, training, testing, avg_probability)
+ROC_prediction_ctree <- prediction(prediction_ctree$probabilities, testing$Is_Resigning)
+
+prediction_logistic <- predictLogistic(variable, training, testing, avg_probability)
+ROC_prediction_logistic <- prediction(prediction_logistic$probabilities, testing$Is_Resigning)
+
+perf <- performance(ROC_prediction_ctree, "tpr", "fpr" )
+perf2 <- performance(ROC_prediction_logistic, "tpr", "fpr")
+plot(perf,  col="blue")
+plot(perf2, add = TRUE,  col="green")
+abline(0,1,col="yellow")
+title(main="ROC Curve", col.main="black", font.main=4)
+legend(-1, 1.9, c("sin", "cos", "tan"), col = c(3,4,6),
+       lty = c(2, -1, 1), pch = c(-1, 3, 4), merge = TRUE, bg='gray90')
