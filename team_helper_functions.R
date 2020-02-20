@@ -103,17 +103,13 @@ predictCTree <- function(variables, training, testing, p) {
   return(list(probabilities = probabilities, classification = classification))
 }
 
-### Analyze clusters
-# files <- c("ProjectData_with_hclust_membership_all_factors.csv",
-#             "ProjectData_with_hclust_membership_compressed_factors.csv",
-#             "ProjectData_with_kmeans_membership_all_factors.csv",
-#             "ProjectData_with_kmeans_membership_compressed_factors.csv")
-# for (file in files) {
-#   data <- read.csv(file, na.strings=c(""," ","NA"), header=TRUE) # Loading data
-#   data <- clean(data)
-#   desc <- describeBy(data, data$cluster, mat = TRUE)
-#   write.csv(desc, paste(file, "_RESULTS.csv"))
-# }
-# 
-
-
+predictLogistic <- function(variables, training, testing, p) {
+  model <- glm(variables, data=training, family="binomial"(link="logit"))
+  probabilities <- predict(model, newdata=testing, type="response")
+  
+  classification <- rep("1", nrow(testing))
+  classification[probabilities < p] = "0"
+  classification <- as.factor(classification)
+  
+  return(list(probabilities = probabilities, classification = classification))
+}
