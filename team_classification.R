@@ -56,7 +56,7 @@ prediction <- predictCTree(variable, training, testing, avg_probability)
 confusionMatrix(prediction$classification,testing$Is_Resigning, positive = "1")
 
 # ROC Curve
-ROC_prediction <- prediction(prediction$probabilities, validation$Is_Resigning)
+ROC_prediction <- prediction(prediction$probabilities, testing$Is_Resigning)
 ROC <- performance(ROC_prediction,"tpr","fpr") # Create ROC curve data
 plot(ROC) # Plot ROC curve
 
@@ -65,3 +65,8 @@ plot(ROC) # Plot ROC curve
 auc.tmp <- performance(ROC_prediction,"auc") # Create AUC data
 auc_validation <- as.numeric(auc.tmp@y.values) # Calculate AUC
 auc_validation
+
+perf <- performance( pred, "tpr", "fpr" )
+perf2 <- performance(pred2, "tpr", "fpr")
+plot(perf, colorize = TRUE)
+plot(perf2, add = TRUE, colorize = TRUE)
